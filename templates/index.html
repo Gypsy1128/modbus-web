@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <title>Modbus 多寄存器监控</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; }
+    h1, h2 { color: #2c3e50; }
+    table { border-collapse: collapse; width: 100%; margin-bottom: 30px; }
+    th, td { border: 1px solid #ccc; padding: 6px 10px; text-align: center; }
+    th { background-color: #eee; }
+    .fail { color: red; }
+  </style>
+  <script>
+    function updateData() {
+      fetch('/data')
+        .then(res => res.json())
+        .then(data => {
+          document.getElementById('timestamp').innerText = data.timestamp;
+          for (const key in data.values) {
+            const cell = document.getElementById(key);
+            if (cell) {
+              cell.innerText = data.values[key];
+              if (data.values[key] === '错误' || data.values[key] === '读取失败') {
+                cell.classList.add('fail');
+              } else {
+                cell.classList.remove('fail');
+              }
+            }
+          }
+        });
+    }
+
+    function writeValue(regName) {
+      const input = document.getElementById('input_' + regName);
+      const value = input.value;
+
+      const formData = new FormData();
+      formData.append('reg_name', regName);
+      formData.append('value', value);
+
+      fetch('/write', {
+        method: 'POST',
+        body: formData
+      })
+      .then(res => res.text())
+      .then(text => {
+        alert(regName + ' 写入结果: ' + text);
+        updateData();
+      });
+    }
+
+    setInterval(updateData, 1000);
+    window.onload = updateData;
+  </script>
+</head>
+<body>
+  <h1>Modbus 多类型寄存器监控</h1>
+  <p>更新时间：<span id="timestamp">--</span></p>
+
+  {% for group, regs in groups.items() %}
+  <h2>{{ group }}</h2>
+  <table>
+    <tr><th>寄存器</th><th>当前值</th><th>写入值</th><th>操作</th></tr>
+    {% for reg in regs.keys() %}
+    <tr>
+      <td>{{ reg }}</td>
+      <td id="{{ reg }}">--</td>
+      <td>
+        {% if group == 'Coil' or group == 'Hold' %}
+        <input type="text" id="input_{{ reg }}" style="width: 80px;">
+        {% else %}
+        -
+        {% endif %}
+      </td>
+      <td>
+        {% if group == 'Coil' or group == 'Hold' %}
+        <button onclick="writeValue('{{ reg }}')">写入</button>
+        {% else %}
+        -
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% endfor %}
+</body>
+</html>
